@@ -8,7 +8,7 @@
 #include "sputnik_motor/modes.h"
 
 #include <geometry_msgs/Twist.h>
-#include "sputnik_motor/Response.h"
+#include <sputnik_motor/Response.h>
 
 const std::string m_dir = "/home/matt/sputnik_modes";
 

@@ -10,14 +10,15 @@
 class SputnikJoy {
 	public:
 		SputnikJoy();
-		void joyCallback(const sensor_msgs::Joy::ConstPtr& Joy);
+		void joyCallbackMerged(const sensor_msgs::Joy::ConstPtr &Joy);
+		void joyCallbackDirect(const sensor_msgs::Joy::ConstPtr &Joy);
 	private:
 		double scaleLinear(double input);
 		double scaleAngular(double input);
 
 		ros::NodeHandle node;
 
-		int linear, angular, deadman, lock, unlock;
+		int linear, angular, deadman, lock, unlock, mode;
 		double l_scale_max, l_scale_min, linear_maintain;
 		double a_scale_max, a_scale_min;
 		bool locked;

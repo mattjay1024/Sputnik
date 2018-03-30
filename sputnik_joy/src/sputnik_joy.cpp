@@ -11,7 +11,8 @@ SputnikJoy::SputnikJoy() :
 	l_scale_min(0.0),
 	a_scale_max(1.2),
 	a_scale_min(0.0),
-	locked(false)
+	locked(false),
+	mode(0)
 {
 	node.param("linear_axis", linear, linear);
 	node.param("angular_axis", angular, angular);
@@ -22,12 +23,21 @@ SputnikJoy::SputnikJoy() :
 	node.param("l_scale_min", l_scale_min, l_scale_min);
 	node.param("a_scale_max", a_scale_max, a_scale_max);
 	node.param("a_scale_min", a_scale_min, a_scale_min);
+	node.param("mode", mode, mode);
 
-	motor_node = node.advertise<sputnik_motor::Response>("/sputnik/motor", 1);
-	joy_node = node.subscribe<sensor_msgs::Joy>("joy", 10, &SputnikJoy::joyCallback, this);
+	switch(mode) {
+		case 0: // direct mode
+			motor_node = node.advertise<geometry_msgs::Twist>("/RosAria/cmd_vel", 1);
+			joy_node = node.subscribe<sensor_msgs::Joy>("joy", 10, &SputnikJoy::joyCallbackDirect, this);
+		break;
+		case 1: // merged mode
+			motor_node = node.advertise<sputnik_motor::Response>("/sputnik/motor", 1);
+			joy_node = node.subscribe<sensor_msgs::Joy>("joy", 10, &SputnikJoy::joyCallbackMerged, this);
+		break;
+	}		
 }
 
-void SputnikJoy::joyCallback(const sensor_msgs::Joy::ConstPtr& Joy) {
+void SputnikJoy::joyCallbackMerged(const sensor_msgs::Joy::ConstPtr &Joy) { // use when combining with multiple inputs
 	sputnik_motor::Response response;
 
 	response.header.stamp = ros::Time::now();
@@ -54,6 +64,31 @@ void SputnikJoy::joyCallback(const sensor_msgs::Joy::ConstPtr& Joy) {
 	}
 
 	motor_node.publish(response);
+}
+
+void SputnikJoy::joyCallbackDirect(const sensor_msgs::Joy::ConstPtr &Joy) { // use when just operating by joystick
+	geometry_msgs::Twist velocities;
+	
+	if(Joy->buttons.size() < 3 || Joy->buttons.empty()) {
+		ROS_INFO("Too few buttons!, ignoring message");
+		return;
+	}
+	
+	if(Joy->buttons[deadman]) {
+		if(Joy->buttons[lock]) {
+			locked = true;
+			linear_maintain = scaleLinear(Joy->axes[linear]);
+		} else if(Joy->buttons[unlock]) {
+			locked = false;
+		}
+		locked ? velocities.linear.x = linear_maintain : velocities.linear.x = scaleLinear(Joy->axes[linear]);
+		velocities.angular.z = scaleAngular(Joy->axes[angular]);
+	} else {
+		velocities.linear.x = 0.0;
+		velocities.angular.z = 0.0;
+	}
+
+	motor_node.publish(velocities);
 }
 
 double SputnikJoy::scaleLinear(double input) {
